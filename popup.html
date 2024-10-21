@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F-SOCIETY VPN</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: black;
+            color: #00ff00;
+            text-align: center;
+        }
+        #vpn-status {
+            font-size: 20px;
+            margin: 20px 0;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+        input:checked + .slider {
+            background-color: #00ff00;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .slider.round {
+            border-radius: 34px;
+        }
+        .slider.round:before {
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <h1>F-SOCIETY VPN</h1>
+    <div id="vpn-status">VPN is OFF</div>
+    <label class="switch">
+        <input type="checkbox" id="vpn-toggle">
+        <span class="slider round"></span>
+    </label>
+
+    <script>
+        const vpnToggle = document.getElementById('vpn-toggle');
+        const vpnStatus = document.getElementById('vpn-status');
+
+        vpnToggle.addEventListener('change', () => {
+            if (vpnToggle.checked) {
+                vpnStatus.textContent = "VPN is ON";
+                // Call VPN activation function here
+                chrome.runtime.sendMessage({ enableVPN: true });
+            } else {
+                vpnStatus.textContent = "VPN is OFF";
+                // Call VPN deactivation function here
+                chrome.runtime.sendMessage({ enableVPN: false });
+            }
+        });
+    </script>
+</body>
+</html>

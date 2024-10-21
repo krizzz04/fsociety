@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phishing Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1c1c1c;
+            color: #ffffff;
+            text-align: center;
+            padding: 50px;
+        }
+        #url {
+            width: 300px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Phishing Detector</h1>
+
+<!-- Phishing detection input field -->
+<input type="text" id="url" placeholder="Enter the URL">
+<button onclick="checkPhishing()">Check Link</button>
+
+<script>
+    var testdata;
+    var prediction;
+
+    // Prediction logic using weighted values
+    function predict(data) {
+        let f = 0;
+        const weight = [
+            0.333346292, -0.111200396, -0.777821806, 0.111058590, 0.389430647,
+            1.99992062, 0.444366975, -0.277951957, -0.0000600531647, 0.333200243,
+            2.66644002, 0.666735991, 0.555496098, 0.0557022408, 0.222225591, -0.166678858
+        ];
+        for (let j = 0; j < data.length; j++) {
+            f += data[j] * weight[j];
+        }
+        return f > 0 ? 1 : -1;
+    }
+
+    // Heuristic functions
+    function isIPInURL(url) {
+        const reg = /\d{1,3}[\.]{1}\d{1,3}[\.]{1}\d{1,3}[\.]{1}\d{1,3}/;
+        return reg.test(url) ? 1 : -1;
+    }
+
+    function isLongURL(url) {
+        return url.length < 54 ? -1 : (url.length <= 75 ? 0 : 1);
+    }
+
+    function isTinyURL(url) {
+        return url.length > 20 ? -1 : 1;
+    }
+
+    function isAlphaNumericURL(url) {
+        return url.includes("@") ? 1 : -1;
+    }
+
+    function isRedirectingURL(url) {
+        const reg1 = /^http:/;
+        const reg2 = /^https:/;
+        const srch = "//";
+        if (url.indexOf(srch) === 5 && reg1.test(url) && !url.substring(7).includes(srch)) {
+            return -1;
+        } else if (url.indexOf(srch) === 6 && reg2.test(url) && !url.substring(8).includes(srch)) {
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+
+    function isHypenURL(url) {
+        return url.includes("-") ? 1 : -1;
+    }
+
+    function isMultiDomainURL(url) {
+        return url.split('.').length < 5 ? -1 : 1;
+    }
+
+    function isFaviconDomainUnidentical(url) {
+        const faviconEl = document.querySelector("link[rel*='shortcut icon']");
+        if (faviconEl) {
+            const faviconUrl = faviconEl.href;
+            return (url.split('/')[2] === faviconUrl.split('/')[2]) ? -1 : 1;
+        }
+        return -1;
+    }
+
+    function isIllegalHttpsURL(url) {
+        return url.includes("https") ? 1 : -1;
+    }
+
+    function isImgFromDifferentDomain() {
+        const totalCount = document.querySelectorAll("img").length;
+        const identicalCount = getIdenticalDomainCount("img");
+        const ratio = (totalCount - identicalCount) / totalCount;
+        return ratio < 0.22 ? -1 : (ratio <= 0.61 ? 0 : 1);
+    }
+
+    function isAnchorFromDifferentDomain() {
+        const totalCount = document.querySelectorAll("a").length;
+        const identicalCount = getIdenticalDomainCount("a");
+        const ratio = (totalCount - identicalCount) / totalCount;
+        return ratio < 0.31 ? -1 : (ratio <= 0.67 ? 0 : 1);
+    }
+
+    function isScLnkFromDifferentDomain() {
+        const totalCount = document.querySelectorAll("script").length + document.querySelectorAll("link").length;
+        const identicalCount = getIdenticalDomainCount("script") + getIdenticalDomainCount("link");
+        const ratio = (totalCount - identicalCount) / totalCount;
+        return ratio < 0.17 ? -1 : (ratio <= 0.81 ? 0 : 1);
+    }
+
+    function isFormActionInvalid() {
+        const totalCount = document.querySelectorAll("form").length;
+        const identicalCount = getIdenticalDomainCount("form");
+        if (document.querySelectorAll('form[action]').length === 0) {
+            return -1;
+        }
+        return identicalCount !== totalCount ? 0 : 1;
+    }
+
+    function isMailToAvailable() {
+        return document.querySelectorAll('a[href^=mailto]').length > 0 ? 1 : -1;
+    }
+
+    function isStatusBarTampered() {
+        return (document.querySelectorAll("a[onmouseover*='window.status']").length <= 0 ||
+            document.querySelectorAll("a[onclick*='location.href']").length <= 0) ? -1 : 1;
+    }
+
+    function isIframePresent() {
+        return document.querySelectorAll('iframe').length > 0 ? 1 : -1;
+    }
+
+    function getIdenticalDomainCount(tag) {
+        let identicalCount = 0;
+        const url = document.getElementById("url").value;
+        const mainDomain = url.split('/')[2];
+        const nodeList = document.querySelectorAll(tag);
+        nodeList.forEach(node => {
+            let i = (tag === "img" || tag === "script") ? node.src : node.href;
+            if (tag === "form") i = node.action;
+            if (mainDomain === i.split('/')[2]) {
+                identicalCount++;
+            }
+        });
+        return identicalCount;
+    }
+
+    // Main function to check phishing
+    function checkPhishing() {
+        var url = document.getElementById("url").value;
+        console.log("Checking URL: ", url); // Log the input URL to verify it's being captured
+
+        if (!url) {
+            createCustomAlert("Please enter a URL", false);
+            return;
+        }
+
+        // Apply heuristics to the provided URL
+        testdata = [
+            isIPInURL(url),
+            isLongURL(url),
+            isTinyURL(url),
+            isAlphaNumericURL(url),
+            isRedirectingURL(url),
+            isHypenURL(url),
+            isMultiDomainURL(url),
+            isFaviconDomainUnidentical(url),
+            isIllegalHttpsURL(url)
+        ];
+
+        console.log("Test Data: ", testdata); // Log the final test data before prediction
+
+        prediction = predict(testdata);
+
+        // Log the prediction result
+        console.log("Prediction Result: ", prediction);
+
+        // Show custom alert with the correct result based on prediction value
+        var message = prediction === 1 ? "Warning! This page might be a phishing site." : "This page appears to be safe.";
+        createCustomAlert(message, prediction === 1);
+    }
+
+    // Custom alert function with futuristic design
+    function createCustomAlert(message, isPhishing) {
+        const alertBox = document.createElement("div");
+        alertBox.id = "custom-alert";
+        alertBox.style.position = "fixed";
+        alertBox.style.top = "20%";
+        alertBox.style.left = "50%";
+        alertBox.style.transform = "translate(-50%, -50%)";
+        alertBox.style.padding = "20px";
+        alertBox.style.backgroundColor = isPhishing ? "rgba(255, 0, 0, 0.9)" : "rgba(0, 128, 0, 0.9)";
+        alertBox.style.color = "#00ff00";
+        alertBox.style.borderRadius = "10px";
+        alertBox.style.zIndex = "9999";
+        alertBox.style.boxShadow = isPhishing ? "0 0 25px rgba(255, 0, 0, 0.8)" : "0 0 25px rgba(0, 255, 0, 0.8)";
+        alertBox.style.fontSize = "20px";
+        alertBox.style.textAlign = "center";
+        alertBox.style.fontFamily = "Courier New, Courier, monospace";
+        alertBox.style.opacity = "0";
+        alertBox.style.transition = "opacity 0.5s ease-in-out";
+        alertBox.innerText = message;
+        document.body.appendChild(alertBox);
+        setTimeout(() => {
+            alertBox.style.opacity = "1";
+        }, 50);
+        setTimeout(() => {
+            alertBox.style.opacity = "0";
+            setTimeout(() => {
+                document.body.removeChild(alertBox);
+            }, 500);
+        }, 3000);
+    }
+</script>
+
+</body>
+</html>
